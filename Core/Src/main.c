@@ -22,7 +22,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "lwip/udp.h"
+#include <string.h>
+#include "timemanagement.h"
+#include "tcpServerRAW.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,6 +51,12 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
 
+ip_addr_t udp_target_ip;
+u16_t udp_target_port = 55151;
+struct udp_pcb* my_udp = NULL;
+struct pbuf* udp_buffer = NULL;
+const char* udp_message = "Hello UDP message!\n\r";
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,13 +66,15 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 /* USER CODE BEGIN PFP */
-
+void upd_init();
+void upd_send();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
 extern struct netif gnetif;
+Timer timer;
 
 /* USER CODE END 0 */
 
@@ -111,7 +122,9 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_LWIP_Init();
   /* USER CODE BEGIN 2 */
-
+  timer_init(&timer, 5000, &TimeSinceStartup64);
+  tcp_server_init();
+  upd_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -121,6 +134,11 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  CalculateTime();
+	  if(timer_run(&timer)){
+		  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		  upd_send();
+	  }
 	  MX_LWIP_Process();
   }
   /* USER CODE END 3 */
@@ -335,7 +353,20 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void upd_init() {
+	  IP_ADDR4(&udp_target_ip, 192, 168, 0, 1);
+	  my_udp = udp_new();
+	  udp_connect(my_udp, &udp_target_ip, udp_target_port);
+}
 
+void upd_send() {
+	udp_buffer = pbuf_alloc(PBUF_TRANSPORT, strlen(udp_message), PBUF_RAM);
+	if (udp_buffer != NULL) {
+		memcpy(udp_buffer->payload, udp_message, strlen(udp_message));
+		udp_send(my_udp, udp_buffer);
+		pbuf_free(udp_buffer);
+	}
+}
 /* USER CODE END 4 */
 
  /* MPU Configuration */

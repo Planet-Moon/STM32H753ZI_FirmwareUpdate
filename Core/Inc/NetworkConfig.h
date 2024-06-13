@@ -1,0 +1,21 @@
+#ifndef NETWORK_CONFIG_H
+#define NETWORK_CONFIG_H
+
+#define IP_ADDRESS_0 192
+#define IP_ADDRESS_1 168
+#define IP_ADDRESS_2 0
+#define IP_ADDRESS_3 10
+
+#define NETMASK_ADDRESS_0 255
+#define NETMASK_ADDRESS_1 255
+#define NETMASK_ADDRESS_2 255
+#define NETMASK_ADDRESS_3 0
+
+#define GATEWAY_0 192
+#define GATEWAY_1 168
+#define GATEWAY_2 0
+#define GATEWAY_3 1
+
+#define TCP_SERVER_PORT 7
+
+#endif // NETWORK_CONFIG_H

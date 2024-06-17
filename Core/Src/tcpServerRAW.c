@@ -58,8 +58,8 @@
 #include "tcpserverRAW.h"
 #include "NetworkConfig.h"
 #include "main.h"
-
 #include "lwip/tcp.h"
+#include "../IAP_StateMachine/IAP_StateMachine.h"
 
 
 /*  protocol states */
@@ -109,7 +109,7 @@ void tcp_server_init(void)
 
 	err_t err;
 
-	/* 2. bind _pcb to port 7 ( protocol) */
+	/* 2. bind _pcb to port TCP_SERVER_PORT ( protocol) */
 	ip_addr_t myIPADDR;
 	IP_ADDR4(&myIPADDR, IP_ADDRESS_0, IP_ADDRESS_1, IP_ADDRESS_2, IP_ADDRESS_3);
 	err = tcp_bind(tpcb, &myIPADDR, TCP_SERVER_PORT);
@@ -477,10 +477,10 @@ static void tcp_server_handle (struct tcp_pcb *tpcb, struct tcp_server_struct *e
 
 	/* get the Remote IP */
 	ip4_addr_t inIP = tpcb->remote_ip;
-	uint16_t inPort = tpcb->remote_port;
+	// uint16_t inPort = tpcb->remote_port;
 
 	/* Extract the IP */
-	char *remIP = ipaddr_ntoa(&inIP);
+	// char *remIP = ipaddr_ntoa(&inIP);
 
 	esTx->state = es->state;
 	esTx->pcb = es->pcb;
@@ -489,9 +489,16 @@ static void tcp_server_handle (struct tcp_pcb *tpcb, struct tcp_server_struct *e
 	char buf[100];
 	memset (buf, '\0', 100);
 
-	strncpy(buf, (char *)es->p->payload, es->p->tot_len);
-	strcat (buf, " + Hello from TCP SERVER\n");
-
+	if(strncmp(es->p->payload, "echo ", (uint8_t)5) == 0){
+	    strncpy(buf, (char *)es->p->payload, es->p->tot_len);
+	    memmove(buf, buf+5, 100-5);
+        strcat (buf, " + Hello from TCP SERVER\n");
+	}
+	else if(strncmp(es->p->payload, "iap ", (uint8_t)4) == 0){
+	    strncpy(buf, (char *)es->p->payload, es->p->tot_len);
+	    memmove(buf, buf+4, 100-4);
+	    IAP_TCP_request(buf, 100);
+	}
 
 	esTx->p->payload = (void *)buf;
 	esTx->p->tot_len = (es->p->tot_len - es->p->len) + strlen (buf);

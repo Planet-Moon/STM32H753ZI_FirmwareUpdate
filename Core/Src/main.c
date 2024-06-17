@@ -26,6 +26,7 @@
 #include <string.h>
 #include "timemanagement.h"
 #include "tcpServerRAW.h"
+#include "../IAP_StateMachine/IAP_StateMachine.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -75,6 +76,7 @@ void upd_send();
 
 extern struct netif gnetif;
 Timer timer;
+bool buttonPressed;
 
 /* USER CODE END 0 */
 
@@ -125,6 +127,7 @@ int main(void)
   timer_init(&timer, 5000, &TimeSinceStartup64);
   tcp_server_init();
   upd_init();
+  IAPinit();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -134,12 +137,23 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  buttonPressed = false;
 	  CalculateTime();
+	  IAPrun();
 	  if(timer_run(&timer)){
 		  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 		  upd_send();
 	  }
 	  MX_LWIP_Process();
+	  if(buttonPressed){
+	      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+	      if(HAL_GPIO_ReadPin(LD3_GPIO_Port, LD3_Pin) == GPIO_PIN_SET){
+	          IAPrequestState(IAP_STATE_Menu);
+	      }
+	      else{
+	          IAPrequestState(IAP_STATE_Idle);
+	      }
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -317,7 +331,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : B1_Pin */
   GPIO_InitStruct.Pin = B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
@@ -348,6 +362,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -366,6 +384,16 @@ void upd_send() {
 		udp_send(my_udp, udp_buffer);
 		pbuf_free(udp_buffer);
 	}
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if(GPIO_Pin == B1_Pin) {
+    buttonPressed = true;
+  }
+  else{
+      __NOP();
+  }
 }
 /* USER CODE END 4 */
 

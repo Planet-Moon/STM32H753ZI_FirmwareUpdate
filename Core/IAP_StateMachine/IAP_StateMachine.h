@@ -14,6 +14,8 @@ typedef enum {
 } IAP_State;
 typedef  void (*pFunction)(void);
 
+#define IAP_BINARY_FILE_SIZE 100*1024 // kBytes
+
 typedef struct {
     IAP_State state;
     IAP_State reqState;
@@ -21,6 +23,7 @@ typedef struct {
     pFunction JumpToApplication;
     uint32_t JumpAddress;
     uint32_t userCmd;
+    char binaryFileBuffer[IAP_BINARY_FILE_SIZE];
 } IAP_StateMachine;
 
 extern IAP_StateMachine iap;

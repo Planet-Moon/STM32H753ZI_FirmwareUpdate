@@ -16,6 +16,6 @@
 #define GATEWAY_2 0
 #define GATEWAY_3 1
 
-#define TCP_SERVER_PORT 7
+#define TCP_SERVER_PORT 8888
 
 #endif // NETWORK_CONFIG_H

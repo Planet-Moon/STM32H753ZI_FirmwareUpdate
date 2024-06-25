@@ -21,6 +21,9 @@
 
 #ifndef INC_TCPSERVERRAW_H_
 #define INC_TCPSERVERRAW_H_
+#include "../IAP_StateMachine/IAP_StateMachine.h"
+
+#define TCP_BUFFER_SIZE IAP_BINARY_FILE_SIZE + 50 // IAP_EXPECTED_BINARY_SIZE + 50
 
 void tcp_server_init(void);
 

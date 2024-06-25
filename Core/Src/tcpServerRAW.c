@@ -59,7 +59,10 @@
 #include "NetworkConfig.h"
 #include "main.h"
 #include "lwip/tcp.h"
-#include "../IAP_StateMachine/IAP_StateMachine.h"
+#include "string.h"
+#include "TCPTransmissionHandler.h"
+
+TCPTransmissionHandler tcpHandler;
 
 
 /*  protocol states */
@@ -91,6 +94,11 @@ static void tcp_server_send(struct tcp_pcb *tpcb, struct tcp_server_struct *es);
 static void tcp_server_connection_close(struct tcp_pcb *tpcb, struct tcp_server_struct *es);
 
 static void tcp_server_handle (struct tcp_pcb *tpcb, struct tcp_server_struct *es);
+
+// tcp buffer
+char tcp_buffer[TCP_BUFFER_SIZE];
+uint32_t tcp_buffer_next_pos;
+uint32_t handle_counter = 0;
 
 
 /* Impementation for the TCP Server
@@ -127,6 +135,8 @@ void tcp_server_init(void)
 		/* deallocate the pcb */
 		memp_free(MEMP_TCP_PCB, tpcb);
 	}
+
+	TCP_PackageHandler_init(&tcpHandler, (char (*)[TCP_BUFFER_SIZE])tcp_buffer);
 }
 
 /**
@@ -464,7 +474,6 @@ static void tcp_server_connection_close(struct tcp_pcb *tpcb, struct tcp_server_
 }
 
 /* Handle the incoming TCP Data */
-
 static void tcp_server_handle (struct tcp_pcb *tpcb, struct tcp_server_struct *es)
 {
 	struct tcp_server_struct *esTx = NULL;
@@ -476,7 +485,7 @@ static void tcp_server_handle (struct tcp_pcb *tpcb, struct tcp_server_struct *e
 #endif
 
 	/* get the Remote IP */
-	ip4_addr_t inIP = tpcb->remote_ip;
+	// ip4_addr_t inIP = tpcb->remote_ip;
 	// uint16_t inPort = tpcb->remote_port;
 
 	/* Extract the IP */
@@ -486,23 +495,44 @@ static void tcp_server_handle (struct tcp_pcb *tpcb, struct tcp_server_struct *e
 	esTx->pcb = es->pcb;
 	esTx->p = es->p;
 
-	char buf[100];
-	memset (buf, '\0', 100);
+	handle_counter++;
+
+	uint32_t received_bytes = es->p->tot_len;
+	char received_bytes_str[20];
+    memset(received_bytes_str,0,5);
+    sprintf(received_bytes_str, "r:%ld\nh:%ld\n", received_bytes, handle_counter);
+
+
+
+    // receive all the data and store it in tcp buffer
+    memset(tcp_buffer, '\0', 100);
+    tcp_buffer_next_pos = 0;
+    struct pbuf* current_pbuf = es->p;
+    while(current_pbuf != NULL && tcp_buffer_next_pos + current_pbuf->len < TCP_BUFFER_SIZE){
+        memcpy(tcp_buffer + tcp_buffer_next_pos, current_pbuf->payload, current_pbuf->len);
+        tcp_buffer_next_pos += current_pbuf->len;
+        current_pbuf = current_pbuf->next;
+    }
 
 	if(strncmp(es->p->payload, "echo ", (uint8_t)5) == 0){
-	    strncpy(buf, (char *)es->p->payload, es->p->tot_len);
-	    memmove(buf, buf+5, 100-5);
-        strcat (buf, " + Hello from TCP SERVER\n");
+	    strncpy(tcp_buffer, (char *)es->p->payload, es->p->tot_len);
+	    memmove(tcp_buffer, tcp_buffer+5, 100-5);
+        strcat(tcp_buffer, " + Hello from TCP SERVER\n");
 	}
 	else if(strncmp(es->p->payload, "iap ", (uint8_t)4) == 0){
-	    strncpy(buf, (char *)es->p->payload, es->p->tot_len);
-	    memmove(buf, buf+4, 100-4);
-	    IAP_TCP_request(buf, 100);
+	    strncpy(tcp_buffer, (char *)es->p->payload, es->p->tot_len);
+	    memmove(tcp_buffer, tcp_buffer+4, 100-4);
+        IAP_TCP_request(tcp_buffer, TCP_BUFFER_SIZE-4);
+	}
+	else{
+	    strncpy(tcp_buffer, (char *)es->p->payload, es->p->tot_len);
 	}
 
-	esTx->p->payload = (void *)buf;
-	esTx->p->tot_len = (es->p->tot_len - es->p->len) + strlen (buf);
-	esTx->p->len = strlen (buf);
+    strcat(tcp_buffer, received_bytes_str);
+
+	esTx->p->payload = (void *)tcp_buffer;
+	esTx->p->tot_len = (es->p->tot_len - es->p->len) + strlen (tcp_buffer);
+	esTx->p->len = strlen(tcp_buffer);
 
 	tcp_server_send(tpcb, esTx);
 	mem_free(esTx);

@@ -25,7 +25,10 @@
 #include "lwip/udp.h"
 #include <string.h>
 #include "timemanagement.h"
+// #define LwIPRAW
+#ifdef USING_HTTPD
 #include "tcpServerRAW.h"
+#endif
 #include "../IAP_StateMachine/IAP_StateMachine.h"
 /* USER CODE END Includes */
 
@@ -74,8 +77,7 @@ void upd_send();
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-extern struct netif gnetif;
-Timer timer;
+Timer timer_250ms;
 bool buttonPressed;
 
 /* USER CODE END 0 */
@@ -124,10 +126,13 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_LWIP_Init();
   /* USER CODE BEGIN 2 */
-  timer_init(&timer, 5000, &TimeSinceStartup64);
+  timer_init(&timer_250ms, 250, &TimeSinceStartup64);
+#ifdef LwIPRAW
   tcp_server_init();
   upd_init();
+#endif
   IAPinit();
+  IAPrequestState(IAP_STATE_Menu);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -140,9 +145,9 @@ int main(void)
 	  buttonPressed = false;
 	  CalculateTime();
 	  IAPrun();
-	  if(timer_run(&timer)){
+	  if(timer_run(&timer_250ms)){
 		  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-		  upd_send();
+		  // upd_send();
 	  }
 	  MX_LWIP_Process();
 	  if(buttonPressed){
@@ -371,11 +376,14 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+#ifdef LwIPRAW // without HTTPD server
 void upd_init() {
+
 	  IP_ADDR4(&udp_target_ip, 192, 168, 0, 1);
 	  my_udp = udp_new();
 	  udp_connect(my_udp, &udp_target_ip, udp_target_port);
 }
+#endif
 
 void upd_send() {
 	udp_buffer = pbuf_alloc(PBUF_TRANSPORT, strlen(udp_message), PBUF_RAM);

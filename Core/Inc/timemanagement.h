@@ -22,6 +22,7 @@
 
  void CalculateTime(void);
  void delayUS_DWT(uint32_t us);
+#define delayMS(ms) delayUS_DWT(ms * 1000)
  void tic(void);
  float toc(void);
 

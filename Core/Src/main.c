@@ -25,10 +25,9 @@
 #include "lwip/udp.h"
 #include <string.h>
 #include "timemanagement.h"
-// #define LwIPRAW
-#ifdef USING_HTTPD
+
 #include "tcpServerRAW.h"
-#endif
+#include "lwip/apps/httpd.h"
 #include "../IAP_StateMachine/IAP_StateMachine.h"
 /* USER CODE END Includes */
 
@@ -127,10 +126,9 @@ int main(void)
   MX_LWIP_Init();
   /* USER CODE BEGIN 2 */
   timer_init(&timer_250ms, 250, &TimeSinceStartup64);
-#ifdef LwIPRAW
-  tcp_server_init();
+  // tcp_server_init();
+  httpd_init();
   upd_init();
-#endif
   IAPinit();
   IAPrequestState(IAP_STATE_Menu);
   /* USER CODE END 2 */
@@ -376,14 +374,12 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-#ifdef LwIPRAW // without HTTPD server
 void upd_init() {
 
 	  IP_ADDR4(&udp_target_ip, 192, 168, 0, 1);
 	  my_udp = udp_new();
 	  udp_connect(my_udp, &udp_target_ip, udp_target_port);
 }
-#endif
 
 void upd_send() {
 	udp_buffer = pbuf_alloc(PBUF_TRANSPORT, strlen(udp_message), PBUF_RAM);

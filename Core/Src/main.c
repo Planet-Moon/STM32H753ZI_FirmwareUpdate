@@ -120,11 +120,17 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+
   MX_GPIO_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_LWIP_Init();
   /* USER CODE BEGIN 2 */
+  // Check if user button is not pressed
+  if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET){
+      IAP_TryLoadApplication();
+  }
+
   timer_init(&timer_250ms, 250, &TimeSinceStartup64);
   // tcp_server_init();
   httpd_init();
@@ -140,6 +146,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+
+
 	  buttonPressed = false;
 	  CalculateTime();
 	  IAPrun();

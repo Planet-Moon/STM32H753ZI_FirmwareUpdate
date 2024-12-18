@@ -1,3 +1,5 @@
+#define EXCLUDE_FROM_BUILD
+#ifndef EXCLUDE_FROM_BUILD
 /**
   ***************************************************************************************************************
   ***************************************************************************************************************
@@ -25,8 +27,8 @@
 
 #include "stm32h7xx_hal.h"
 
-#define APPLICATION_ADDRESS 0x08100000
-#define APPLICATION_END_ADDRESS 0x081FFFFF
+#define APPLICATION_ADDRESS (uint32_t)0x08100000
+#define APPLICATION_END_ADDRESS (uint32_t)0x081FFFFF
 
 /* Exported constants --------------------------------------------------------*/
 
@@ -67,3 +69,4 @@ void Flash_Write_NUM (uint32_t StartSectorAddress, float Num);
 float Flash_Read_NUM (uint32_t StartSectorAddress);
 
 #endif /* INC_FLASH_SECTOR_H7_H_ */
+#endif

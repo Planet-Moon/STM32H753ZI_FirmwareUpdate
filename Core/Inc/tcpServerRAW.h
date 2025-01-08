@@ -23,7 +23,7 @@
 #define INC_TCPSERVERRAW_H_
 #include "../IAP_StateMachine/IAP_StateMachine.h"
 
-#define TCP_BUFFER_SIZE IAP_BINARY_FILE_SIZE + 50 // IAP_EXPECTED_BINARY_SIZE + 50
+#define TCP_BUFFER_SIZE 8*1024 // 8 kByte, see: https://www.ibm.com/docs/en/was-nd/8.5.5?topic=environment-tuning-tcpip-buffer-sizes
 
 void tcp_server_init(void);
 

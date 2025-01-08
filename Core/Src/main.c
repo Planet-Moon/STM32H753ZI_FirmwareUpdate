@@ -76,7 +76,9 @@ void upd_send();
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+Timer timer_50ms;
 Timer timer_250ms;
+Timer timer_1500ms;
 bool buttonPressed;
 
 /* USER CODE END 0 */
@@ -126,17 +128,21 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_LWIP_Init();
   /* USER CODE BEGIN 2 */
-  // Check if user button is not pressed
-  if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET){
-      IAP_TryLoadApplication();
-  }
 
+  timer_init(&timer_50ms, 50, &TimeSinceStartup64);
   timer_init(&timer_250ms, 250, &TimeSinceStartup64);
+  timer_init(&timer_1500ms, 1500, &TimeSinceStartup64);
   // tcp_server_init();
   httpd_init();
-  upd_init();
+  //upd_init();
   IAPinit();
-  IAPrequestState(IAP_STATE_Menu);
+
+  // Check if user button is pressed
+  if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET){
+      // clear flash bank2
+      IAP_FlashBank2Clear();
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -146,26 +152,21 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-
-
-	  buttonPressed = false;
 	  CalculateTime();
-	  IAPrun();
+
 	  if(timer_run(&timer_250ms)){
-		  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		  HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 		  // upd_send();
 	  }
-	  MX_LWIP_Process();
 	  if(buttonPressed){
-	      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-	      if(HAL_GPIO_ReadPin(LD3_GPIO_Port, LD3_Pin) == GPIO_PIN_SET){
-	          IAPrequestState(IAP_STATE_Menu);
-	      }
-	      else{
-	          IAPrequestState(IAP_STATE_Idle);
-	      }
+	      buttonPressed = false;
+	      // copyFlashFromBank1ToBank2();
+	      bankSwap();
 	  }
+
+
+      HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, BankSwapBit() ? GPIO_PIN_SET : GPIO_PIN_RESET);
+	  MX_LWIP_Process();
   }
   /* USER CODE END 3 */
 }

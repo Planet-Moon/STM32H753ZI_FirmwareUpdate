@@ -13,14 +13,14 @@
 
 typedef enum  {
     PostAddressee_None,
+    PostAddressee_ReadFlash,
     PostAddressee_IAPBinaryFile,
-    PostAddressee_IAPCopyBinaryToFlash,
-    PostAddressee_IAPLoadApplication
+    PostAddressee_IAPLoadNewFw
 } PostAddressee;
 
 PostAddressee postAddressee = PostAddressee_None;
-#define FILENAME_LENGHT 20
-char filename[FILENAME_LENGHT];
+#define FILENAME_LENGTH 20
+char filename[FILENAME_LENGTH];
 
 /**
  * @ingroup httpd
@@ -46,17 +46,13 @@ err_t httpd_post_begin(void *connection, const char *uri, const char *http_reque
                        u16_t http_request_len, int content_len, char *response_uri,
                        u16_t response_uri_len, u8_t *post_auto_wnd){
     struct http_state* hs = (struct http_state*)connection;
-    if(strcmp(uri,"/upload.cgi")==0){
+    if(strcmp(uri,"/uploadFirmware")==0){
         postAddressee = PostAddressee_IAPBinaryFile;
-        IAP_BufferClear();
+        IAP_FlashWriteInit();
         return ERR_OK;
     }
-    else if(strcmp(uri,"/copyBufferToFlash")==0){
-        postAddressee = PostAddressee_IAPCopyBinaryToFlash;
-        return ERR_OK;
-    }
-    else if(strcmp(uri,"/loadApp")==0){
-        postAddressee = PostAddressee_IAPLoadApplication;
+    else if(strcmp(uri,"/loadNewFw")==0){
+        postAddressee = PostAddressee_IAPLoadNewFw;
         return ERR_OK;
     }
     postAddressee = PostAddressee_None;
@@ -75,20 +71,9 @@ err_t httpd_post_begin(void *connection, const char *uri, const char *http_reque
  */
 err_t httpd_post_receive_data(void *connection, struct pbuf *p) {
     err_t result = ERR_OK;
-
     if(postAddressee == PostAddressee_IAPBinaryFile){
-        if(!IAP_BufferAppend(p->payload, p->len)){
-            result = ERR_MEM;
-        }
-    }
-    else if(postAddressee == PostAddressee_IAPCopyBinaryToFlash){
-        if(!IAP_CopyBufferToFlash()){
-            result = ERR_MEM;
-        }
-    }
-    else if(postAddressee == PostAddressee_IAPLoadApplication){
-        if(IAPrequestState(IAP_STATE_LoadWait)){
-            result = ERR_MEM;
+        if(!IAP_FlashWrite(p->payload, p->len)){
+            return ERR_MEM;
         }
     }
     pbuf_free(p);
@@ -108,6 +93,9 @@ err_t httpd_post_receive_data(void *connection, struct pbuf *p) {
  */
 void httpd_post_finished(void *connection, char *response_uri, u16_t response_uri_len) {
     struct http_state* hs = (struct http_state*)connection;
+    if(postAddressee == PostAddressee_IAPBinaryFile){
+        IAP_FlashWriteRemaining();
+    }
     postAddressee = PostAddressee_None;
     strcpy(response_uri,"/index.html");
     return;

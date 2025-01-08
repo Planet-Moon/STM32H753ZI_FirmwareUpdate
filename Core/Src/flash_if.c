@@ -32,6 +32,34 @@ static uint32_t GetSector(uint32_t Address);
 
 /* Private functions ---------------------------------------------------------*/
 
+
+FlashErrors FLASH_If_Errors() {
+    uint32_t errors = HAL_FLASH_GetError();
+    FlashErrors result;
+    result.bank1.WriteProtErr = errors & HAL_FLASH_ERROR_WRP_BANK1;
+    result.bank1.ProgSeqErr = errors & HAL_FLASH_ERROR_PGS_BANK1;
+    result.bank1.StrobeErr = errors & HAL_FLASH_ERROR_STRB_BANK1;
+    result.bank1.InconErr = errors & HAL_FLASH_ERROR_INC_BANK1;
+    result.bank1.OpErr = errors & HAL_FLASH_ERROR_OPE_BANK1;
+    result.bank1.ReadProtErr = errors & HAL_FLASH_ERROR_RDP_BANK1;
+    result.bank1.ReadSecErr = errors & HAL_FLASH_ERROR_RDS_BANK1;
+    result.bank1.SECCErr = errors & HAL_FLASH_ERROR_SNECC_BANK1;
+    result.bank1.DECCErr = errors & HAL_FLASH_ERROR_DBECC_BANK1;
+    result.bank1.CRCRErr = errors & HAL_FLASH_ERROR_CRCRD_BANK1;
+
+    result.bank2.WriteProtErr = errors & HAL_FLASH_ERROR_WRP_BANK2;
+    result.bank2.ProgSeqErr = errors & HAL_FLASH_ERROR_PGS_BANK2;
+    result.bank2.StrobeErr = errors & HAL_FLASH_ERROR_STRB_BANK2;
+    result.bank2.InconErr = errors & HAL_FLASH_ERROR_INC_BANK2;
+    result.bank2.OpErr = errors & HAL_FLASH_ERROR_OPE_BANK2;
+    result.bank2.ReadProtErr = errors & HAL_FLASH_ERROR_RDP_BANK2;
+    result.bank2.ReadSecErr = errors & HAL_FLASH_ERROR_RDS_BANK2;
+    result.bank2.SECCErr = errors & HAL_FLASH_ERROR_SNECC_BANK2;
+    result.bank2.DECCErr = errors & HAL_FLASH_ERROR_DBECC_BANK2;
+    result.bank2.CRCRErr = errors & HAL_FLASH_ERROR_CRCRD_BANK2;
+    return result;
+}
+
 /**
   * @brief  Unlocks Flash for write access
   * @param  None
@@ -53,7 +81,7 @@ void FLASH_If_Init(void)
   */
 uint32_t FLASH_If_Erase(uint32_t StartSector)
 {
-  uint32_t UserStartSector;
+  uint32_t _StartSector;
   uint32_t SectorError;
   FLASH_EraseInitTypeDef pEraseInit;
 
@@ -62,14 +90,14 @@ uint32_t FLASH_If_Erase(uint32_t StartSector)
   FLASH_If_Init();
 
   /* Get the sector where start the user flash area */
-  UserStartSector = GetSector(APPLICATION_ADDRESS);
+  _StartSector = GetSector(FLASH_BANK2_ADDRESS);
 
   pEraseInit.TypeErase = FLASH_TYPEERASE_SECTORS;
-  pEraseInit.Sector = UserStartSector;
-  pEraseInit.NbSectors = 8 - UserStartSector;
+  pEraseInit.Sector = _StartSector;
+  pEraseInit.NbSectors = 8 - _StartSector;
   pEraseInit.VoltageRange = FLASH_VOLTAGE_RANGE_3;
 
-  if (APPLICATION_ADDRESS < ADDR_FLASH_SECTOR_0_BANK2)
+  if (FLASH_BANK2_ADDRESS < ADDR_FLASH_SECTOR_0_BANK2)
   {
     pEraseInit.Banks = FLASH_BANK_1;
     SCB_DisableICache();
@@ -105,6 +133,82 @@ uint32_t FLASH_If_Erase(uint32_t StartSector)
   }
   HAL_FLASH_Lock();
   return (0);
+}
+
+
+/**
+  * @brief  This function does an erase of Flash bank 2
+  * @retval 0: user flash area successfully erased
+  *         1: error occurred
+  */
+uint32_t FLASH_If_EraseBank2() {
+    // from RM0433 page 167:
+    // 1. Check and clear (optional) all the error flags due to previous programming/erase
+    // operation. Refer to Section 4.7: FLASH error management for details.
+    // 2. Unlock FLASH_OPTCR register, as described in Section 4.5.1: FLASH configuration
+    // protection (only if register is not already unlocked).
+    // 3. If a PCROP-protected area exists set DMEP1/2 bit in FLASH_PRAR_PRG1/2 register.
+    // In addition, program the PCROP area end and start addresses so that the difference is
+    // negative, i.e. PROT_AREA_END1/2 < PROT_AREA_START1/2.
+    // 4. If a secure-only area exists set DMES1/2 bit in FLASH_SCAR_PRG1/2 register. In
+    // addition, program the secure-only area end and start addresses so that the difference
+    // is negative, i.e. SEC_AREA_END1/2 < SEC_AREA_START1/2.
+    // 5. Set all WRPSn1/2 bits in FLASH_WPSN_PRG1/2R to 1 to disable all sector write
+    // protection.
+    // 6. Unlock FLASH_CR1/2 register, only if register is not already unlocked.
+    // 7. Set the BER1/2 bit in the FLASH_CR1/2 register corresponding to the target bank.
+    // 8. Set the START1/2 bit in the FLASH_CR1/2 register to start the bank erase with
+    // protection removal operation. Then wait until the QW1/2 bit is cleared in the
+    // corresponding FLASH_SR1/2 register. At that point a bank erase operation has erased
+    // the whole bank including the sectors containing PCROP-protected and/or secure-only
+    // data, and an option byte change has been automatically performed so that all the
+    // protections are disabled.
+    // Note: BER1/2 and START1/2 bits can be set together, so above steps 8 and 9 can be merged.
+    // Be aware of the following warnings regarding to above sequence:
+    // • It is not possible to perform the above sequence on one bank while modifying the
+    // protection parameters of the other bank.
+    // • No other option bytes than the one indicated above must be changed, and no
+    // protection change must be performed in the bank that is not targeted by the bank erase
+    // with protection removal request.
+    // • When one or both of the events above occurs, a simple bank erase occurs, no option
+    // byte change is performed and no option change error is set.
+
+    { // 1. Check error flags
+        uint32_t flashError = HAL_FLASH_GetError();
+        if(flashError){
+            return 1;
+        }
+    }
+    {
+        HAL_StatusTypeDef halStatus = HAL_FLASHEx_Unlock_Bank2();
+        if(halStatus != HAL_OK){
+            return 2;
+        }
+    }
+    {
+        HAL_StatusTypeDef halStatus = HAL_FLASH_OB_Unlock();
+        if(halStatus != HAL_OK){
+            return 3;
+        }
+    }
+    {
+        FLASH_EraseInitTypeDef pEraseInit;
+        pEraseInit.TypeErase = FLASH_TYPEERASE_MASSERASE; // or FLASH_TYPEERASE_SECTORS
+        pEraseInit.Banks = FLASH_BANK_2;
+        pEraseInit.Sector = FLASH_SECTOR_0; // initial flash sector to be erased. Optional for mass erase
+        pEraseInit.NbSectors = 1; // number of sectors to be erased
+        pEraseInit.VoltageRange = FLASH_VOLTAGE_RANGE_4; // Flash program/erase by 64 bits
+        uint32_t SectorError = 0; // SectorError only valid in sector erase
+        HAL_StatusTypeDef halStatus = HAL_FLASHEx_Erase(&pEraseInit, &SectorError);
+        if(halStatus != HAL_OK){
+            return 4;
+        }
+    }
+
+    HAL_FLASH_OB_Lock();
+    HAL_FLASHEx_Lock_Bank1();
+    uint32_t flashError = HAL_FLASH_GetError();
+    return 0;
 }
 
 /**
@@ -161,7 +265,7 @@ uint16_t FLASH_If_GetWriteProtectionStatus(void)
   uint32_t ProtectedSECTOR = 0x0;
   FLASH_OBProgramInitTypeDef OptionsBytesStruct;
 
-  if (APPLICATION_ADDRESS < ADDR_FLASH_SECTOR_0_BANK2)
+  if (FLASH_BANK2_ADDRESS < ADDR_FLASH_SECTOR_0_BANK2)
   {
     /* Select Bank1 */
     OptionsBytesStruct.Banks = FLASH_BANK_1;
@@ -289,7 +393,7 @@ HAL_StatusTypeDef FLASH_If_WriteProtectionConfig(uint32_t modifier)
 
   /* Unlock the Options Bytes *************************************************/
   HAL_FLASH_OB_Unlock();
-  if (APPLICATION_ADDRESS < ADDR_FLASH_SECTOR_0_BANK2)
+  if (FLASH_BANK2_ADDRESS < ADDR_FLASH_SECTOR_0_BANK2)
   {
     /* Select Bank1 */
     config_old.Banks = FLASH_BANK_1;

@@ -7,39 +7,32 @@
 #include "stddef.h"
 #include "timemanagement.h"
 
-typedef enum {
-    IAP_STATE_Idle,
-    IAP_STATE_Menu,
-    IAP_STATE_LoadWait,
-    IAP_STATE_Load,
-    IAP_STATE_None
-} IAP_State;
-typedef  void (*pFunction)(void);
 
-#define IAP_BINARY_FILE_SIZE 100*1024 // kBytes
+#define IAP_FLASH_BUFFER_SIZE 32 // size of a flash write queue in Bytes (32*8 = 256 bit)
 
 typedef struct {
-    IAP_State state;
-    IAP_State reqState;
     uint32_t FlashProtection;
-    pFunction JumpToApplication;
-    uint32_t JumpAddress;
-    uint32_t userCmd;
-    char binaryFileBuffer[IAP_BINARY_FILE_SIZE];
-    size_t binaryFileEndIdx;
-    Timer loadWaitTimer;
+    uint8_t flashBuffer[IAP_FLASH_BUFFER_SIZE]; // 256 bits for address alignment
+    size_t flashBufferEndIdx;
+    uint32_t writeFlashAddress;
+    uint16_t bytesWrittenToFlash;
+    uint32_t error;
 } IAP_StateMachine;
 
 extern IAP_StateMachine iap;
 bool IAPinit();
-bool IAPrequestState(IAP_State state);
-bool IAPrun();
 bool IAP_TCP_request(char* req, size_t size);
-void IAP_BufferClear();
-bool IAP_BufferAppend(const char* data, size_t len);
-bool IAP_CopyBufferToFlash();
-bool IAP_CopyFlashToBuffer();
-bool IAP_LoadApplication();
-bool IAP_TryLoadApplication();
+void IAP_FlashWriteInit();
+bool IAP_FlashWrite(const void* data, size_t len);
+void IAP_FlashWriteRemaining();
+bool IAP_UpdatePrepared();
+void IAP_FlashBank2Clear();
+
+void test_OBGetConfig();
+void bankSwap();
+bool compareFlashBankData();
+bool copyFlashFromBank1ToBank2();
+bool BankSwapBit();
+bool BankSwapNextReset();
 
 #endif // IAP_STATEMACHINE_H_

@@ -22,6 +22,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32h7xx_hal.h"
+#include "stdbool.h"
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
@@ -62,12 +63,9 @@ enum{
 
 /* End of the Flash address */
 #define USER_FLASH_END_ADDRESS        0x081FFFFF
-/* Define the user application size */
-#define USER_FLASH_SIZE   (USER_FLASH_END_ADDRESS - APPLICATION_ADDRESS + 1)
 
-/* Define the address from where user application will be loaded.
-   Note: the 1st sector 0x08000000-0x0801FFFF is reserved for the IAP code */
-#define APPLICATION_ADDRESS   (uint32_t)0x08100000
+/* Define the address for the second flash bank */
+#define FLASH_BANK2_ADDRESS   ADDR_FLASH_SECTOR_0_BANK2
 
 /* Define bitmap representing user flash area that could be write protected (check restricted to pages 8-39). */
 #define FLASH_SECTOR_TO_BE_PROTECTED (OB_WRP_SECTOR_0 | OB_WRP_SECTOR_1 | OB_WRP_SECTOR_2 | OB_WRP_SECTOR_3 |\
@@ -75,8 +73,27 @@ enum{
 
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
+typedef struct {
+    bool WriteProtErr; // Write protection error
+    bool ProgSeqErr; // Programming sequence error
+    bool StrobeErr; // Strobe Error
+    bool InconErr; // Inconsistency error
+    bool OpErr; // Operation error
+    bool SECCErr; // Single error correction error
+    bool DECCErr; // Double error correction error
+    bool ReadProtErr; // Read protection error
+    bool ReadSecErr; // Read secure error
+    bool CRCRErr; // CRC Read Error
+    // bool OptBytChangeErrr; // Option byte change error (not used by HAL??)
+} FlashBankError;
+typedef struct {
+    FlashBankError bank1;
+    FlashBankError bank2;
+} FlashErrors;
+FlashErrors FLASH_If_Errors();
 void              FLASH_If_Init(void);
 uint32_t          FLASH_If_Erase(uint32_t StartSector);
+uint32_t          FLASH_If_EraseBank2();
 uint32_t          FLASH_If_Write(uint32_t FlashAddress, uint32_t* Data, uint32_t DataLength);
 uint16_t          FLASH_If_GetWriteProtectionStatus(void);
 HAL_StatusTypeDef FLASH_If_WriteProtectionConfig(uint32_t modifier);

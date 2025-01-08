@@ -5,10 +5,10 @@
 <body bgcolor="white" text="black">
     <table width="100%">
 		<tr valign="top">
-      		<td width="80">	  
+      		<td width="80">
 	  			<a href="http://www.sics.se/"><img src="/img/sics.gif" border="0" alt="SICS logo" title="SICS logo"></a>
 			</td>
-			<td width="500">	  
+			<td width="500">
 	  			<h1>lwIP - A Lightweight TCP/IP Stack</h1>
 	  			<p>
 			    The web page you are watching was served by a simple web
@@ -46,14 +46,46 @@
 			</td>
 		</tr>
     </table>
-    <form action ="/upload.cgi" enctype="multipart/form-data" method="post">
-		<p>Please specify a binary file to upload into STM32F2x7 flash:
-			<br>
-			<input type="file" name="datafile" size="40">
-		</p>
-		<div>
-			<input type="submit" value="Upload">
-		</div>
-	</form>
+
+    <div style="margin-top: 1em;">
+        <input type="file" id="selectFile" style="display: none"/>
+        <button id="selectFileBtn">choose file...</button>
+        <span>Selected file:</span> <span id="selectFileDsp"></span> <br/>
+        <button id="uploadFileBtn" style="margin: 0.5em 0;" disabled>upload file</button>
+        <div id="progressDsp" style="margin-top: 1em;"></div>
+	</div>
+
+	<script>
+		var selectedFile; // selected file
+
+		// When user clicks on a button, trigger file selection dialog
+		document.getElementById('selectFileBtn').onclick = function(ev) {
+		  document.getElementById('selectFile').click();
+		};
+
+		document.getElementById('uploadFileBtn').onclick = function(ev) {
+		  var fileReader = new FileReader();
+		  fileReader.readAsArrayBuffer(selectedFile);
+		  fileReader.onload = function() {
+			ev.target.value = '';
+			document.getElementById('progressDsp').innerText = 'Uploading...';
+			fetch(`/uploadFirmware`, {
+			  method: 'POST',
+			  body: fileReader.result,
+			}).then(function(res) {
+			  document.getElementById('progressDsp').innerText = 'Uploaded ' + fileReader.result.byteLength + ' bytes';
+			});
+		  };
+		};
+
+		// If user selected a file, read it into memory and trigger sendFileData()
+		document.getElementById('selectFile').onchange = function(ev) {
+		  selectedFile = ev.target.files[0];
+		  if (!selectedFile) return;
+		  document.getElementById('selectFileDsp').innerText = selectedFile.name;
+		  document.getElementById('uploadFileBtn').removeAttribute('disabled');
+		};
+
+	</script>
 </body>
 </html>

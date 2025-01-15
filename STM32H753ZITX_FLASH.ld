@@ -166,19 +166,25 @@ SECTIONS
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
   } >RAM_D1
-  
+
   /* ETH_CODE: add placement of DMA descriptors and RX buffers */
   .lwip_sec (NOLOAD) :
   {
     . = ABSOLUTE(0x30000000);
     *(.RxDecripSection)
-    
+
     . = ABSOLUTE(0x30000080);
     *(.TxDecripSection)
-    
+
     . = ABSOLUTE(0x30000100);
-    *(.Rx_PoolSection)  
+    *(.Rx_PoolSection)
   } >RAM_D2
+
+  /* version section in flash */
+  .version_section 0x080FFF7C :
+  {
+  	KEEP(*(.version_section))
+  } >FLASH
 
   /* Remove information from the standard libraries */
   /DISCARD/ :
@@ -190,5 +196,3 @@ SECTIONS
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
 }
-
-

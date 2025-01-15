@@ -68,13 +68,7 @@
 		  fileReader.readAsArrayBuffer(selectedFile);
 		  fileReader.onload = function() {
 			ev.target.value = '';
-			document.getElementById('progressDsp').innerText = 'Uploading...';
-			fetch(`/uploadFirmware`, {
-			  method: 'POST',
-			  body: fileReader.result,
-			}).then(function(res) {
-			  document.getElementById('progressDsp').innerText = 'Uploaded ' + fileReader.result.byteLength + ' bytes';
-			});
+			sendFileData(selectedFile.name, new Uint8Array(fileReader.result), 128*1024);
 		  };
 		};
 
@@ -86,6 +80,41 @@
 		  document.getElementById('uploadFileBtn').removeAttribute('disabled');
 		};
 
+		var setStatus = function(text) {
+			document.getElementById('progressDsp').innerText = text;
+		};
+
+		// Send a large blob of data chunk by chunk
+		var sendFileData = function(name, data, chunkSize) {
+			var nChunks = Math.ceil(data.length/chunkSize);
+			if(nChunks <= 0) return;
+			var sendChunk = function(chunkIdx) {
+				if(chunkIdx == nChunks){
+					fetch('/upe',{method:'POST'});
+					return;
+				}
+				var offset = chunkIdx * chunkSize;
+				var chunk = data.subarray(offset, offset + chunkSize) || '';
+				var opts = {method: 'POST', body: chunk};
+				var url = '/upw&'+ chunkIdx+'&'+chunk.length;
+				var ok;
+				setStatus('Uploading ' + name + ', chunk ' + (chunkIdx+1) + ' of ' + nChunks);
+				fetch(url, opts)
+					.then(function(res) {
+						if (res.ok && chunk.length > 0) sendChunk(chunkIdx+1);
+						ok = res.ok;
+						return res.text();
+					})
+					.then(function(text) {
+						if (!ok) setStatus('Error: ' + text);
+					});
+			};
+			fetch('/upb&'+nChunks+'&'+data.length,{method:'POST'}).then(function(res){
+				if(res.ok){
+					sendChunk(0);
+				}
+			});
+		};
 	</script>
 </body>
 </html>

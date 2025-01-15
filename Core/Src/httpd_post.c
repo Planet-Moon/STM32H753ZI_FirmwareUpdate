@@ -9,18 +9,26 @@
 #include "httpd.h"
 #include "string.h"
 #include "mem.h"
-#include "../IAP_StateMachine/IAP_StateMachine.h"
+
+#include "../ota/ota.h"
+#include "../ota/ota_utils.h"
+#include "../udp/udp.h"
 
 typedef enum  {
     PostAddressee_None,
-    PostAddressee_ReadFlash,
-    PostAddressee_IAPBinaryFile,
-    PostAddressee_IAPLoadNewFw
+    PostAddressee_OTA_Begin,
+    PostAddressee_OTA_Write,
+    PostAddressee_OTA_End
 } PostAddressee;
 
 PostAddressee postAddressee = PostAddressee_None;
 #define FILENAME_LENGTH 20
 char filename[FILENAME_LENGTH];
+
+static uint16_t s_chunks = 0;
+static uint32_t s_contentLength = 0;
+static uint16_t s_chunkIdx = 0;
+static uint32_t s_chunkSize = 0;
 
 /**
  * @ingroup httpd
@@ -46,17 +54,34 @@ err_t httpd_post_begin(void *connection, const char *uri, const char *http_reque
                        u16_t http_request_len, int content_len, char *response_uri,
                        u16_t response_uri_len, u8_t *post_auto_wnd){
     struct http_state* hs = (struct http_state*)connection;
-    if(strcmp(uri,"/uploadFirmware")==0){
-        postAddressee = PostAddressee_IAPBinaryFile;
-        IAP_FlashWriteInit();
+
+    udp_send_message(uri);
+    if(parseOTABeginRequest(uri, &s_chunks, &s_contentLength)){
+        if(ota_begin(s_contentLength)){
+            postAddressee = PostAddressee_OTA_Begin;
+        }
+    }
+    else if(parseOTAWriteRequest(uri, &s_chunkIdx, &s_chunkSize)){
+        if(postAddressee == PostAddressee_OTA_Begin){
+            postAddressee = PostAddressee_OTA_Write;
+        }
+    }
+    else if(parseOTAEndRequest(uri)){
+        if(postAddressee == PostAddressee_OTA_Write){
+            ota_end();
+            postAddressee = PostAddressee_OTA_End;
+        }
+    }
+    else {
+        postAddressee = PostAddressee_None;
+    }
+
+    if(postAddressee != PostAddressee_None){
         return ERR_OK;
     }
-    else if(strcmp(uri,"/loadNewFw")==0){
-        postAddressee = PostAddressee_IAPLoadNewFw;
-        return ERR_OK;
+    else {
+        return ERR_VAL;
     }
-    postAddressee = PostAddressee_None;
-    return ERR_VAL;
 }
 
 /**
@@ -71,9 +96,18 @@ err_t httpd_post_begin(void *connection, const char *uri, const char *http_reque
  */
 err_t httpd_post_receive_data(void *connection, struct pbuf *p) {
     err_t result = ERR_OK;
-    if(postAddressee == PostAddressee_IAPBinaryFile){
-        if(!IAP_FlashWrite(p->payload, p->len)){
-            return ERR_MEM;
+    char udp_message[40];
+    snprintf(udp_message, 40, "Receive data tot_len %d", p->tot_len);
+    if(postAddressee == PostAddressee_OTA_Write){
+        uint16_t pIdx = 0;
+        for(struct pbuf* pb = p; pb != NULL; pb = pb->next){
+            snprintf(udp_message, 40, "OTA Chunk %d: Writing %d bytes - %d", s_chunkIdx, pb->len, ++pIdx);
+            udp_send_message(udp_message);
+            /*
+            if(!ota_write(p->payload, p->len)){
+                return ERR_MEM;
+            }
+            */
         }
     }
     pbuf_free(p);
@@ -93,10 +127,8 @@ err_t httpd_post_receive_data(void *connection, struct pbuf *p) {
  */
 void httpd_post_finished(void *connection, char *response_uri, u16_t response_uri_len) {
     struct http_state* hs = (struct http_state*)connection;
-    if(postAddressee == PostAddressee_IAPBinaryFile){
-        IAP_FlashWriteRemaining();
+    if(postAddressee != PostAddressee_None){
+        strcpy(response_uri,"/ok.html");
     }
-    postAddressee = PostAddressee_None;
-    strcpy(response_uri,"/index.html");
     return;
 }

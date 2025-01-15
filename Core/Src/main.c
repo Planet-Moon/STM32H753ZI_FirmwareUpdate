@@ -22,13 +22,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "lwip/udp.h"
 #include <string.h>
 #include "timemanagement.h"
 
 #include "tcpServerRAW.h"
 #include "lwip/apps/httpd.h"
-#include "../IAP_StateMachine/IAP_StateMachine.h"
+
+#include "../udp/udp.h"
+#include "../ota/ota_stm32h753ZI.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,12 +55,6 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
 
-ip_addr_t udp_target_ip;
-u16_t udp_target_port = 55151;
-struct udp_pcb* my_udp = NULL;
-struct pbuf* udp_buffer = NULL;
-const char* udp_message = "Hello UDP message!\n\r";
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,16 +64,15 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 /* USER CODE BEGIN PFP */
-void upd_init();
-void upd_send();
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
 Timer timer_50ms;
-Timer timer_250ms;
 Timer timer_1500ms;
+Timer timer_10000ms;
 bool buttonPressed;
 
 /* USER CODE END 0 */
@@ -130,17 +124,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   timer_init(&timer_50ms, 50, &TimeSinceStartup64);
-  timer_init(&timer_250ms, 250, &TimeSinceStartup64);
   timer_init(&timer_1500ms, 1500, &TimeSinceStartup64);
+  timer_init(&timer_10000ms, 10000, &TimeSinceStartup64);
   // tcp_server_init();
   httpd_init();
-  //upd_init();
-  IAPinit();
+  udp_create_instance();
 
   // Check if user button is pressed
   if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET){
-      // clear flash bank2
-      IAP_FlashBank2Clear();
+
   }
 
   /* USER CODE END 2 */
@@ -154,14 +146,13 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  CalculateTime();
 
-	  if(timer_run(&timer_250ms)){
-		  HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-		  // upd_send();
+	  if(timer_run(&timer_10000ms)){
+		  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		  udp_send_message("10s timer triggered");
 	  }
 	  if(buttonPressed){
 	      buttonPressed = false;
-	      // copyFlashFromBank1ToBank2();
-	      bankSwap();
+
 	  }
 
 
@@ -384,21 +375,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void upd_init() {
-
-	  IP_ADDR4(&udp_target_ip, 192, 168, 0, 1);
-	  my_udp = udp_new();
-	  udp_connect(my_udp, &udp_target_ip, udp_target_port);
-}
-
-void upd_send() {
-	udp_buffer = pbuf_alloc(PBUF_TRANSPORT, strlen(udp_message), PBUF_RAM);
-	if (udp_buffer != NULL) {
-		memcpy(udp_buffer->payload, udp_message, strlen(udp_message));
-		udp_send(my_udp, udp_buffer);
-		pbuf_free(udp_buffer);
-	}
-}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

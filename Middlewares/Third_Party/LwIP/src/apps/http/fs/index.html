@@ -68,7 +68,7 @@
 		  fileReader.readAsArrayBuffer(selectedFile);
 		  fileReader.onload = function() {
 			ev.target.value = '';
-			sendFileData(selectedFile.name, new Uint8Array(fileReader.result), 128*1024);
+			sendFileData(selectedFile.name, new Uint8Array(fileReader.result), 50*1024);
 		  };
 		};
 

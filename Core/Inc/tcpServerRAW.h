@@ -21,7 +21,7 @@
 
 #ifndef INC_TCPSERVERRAW_H_
 #define INC_TCPSERVERRAW_H_
-#include "../IAP_StateMachine/IAP_StateMachine.h"
+#include "../ota/IAP_StateMachine.h"
 
 #define TCP_BUFFER_SIZE 8*1024 // 8 kByte, see: https://www.ibm.com/docs/en/was-nd/8.5.5?topic=environment-tuning-tcpip-buffer-sizes
 

@@ -10,6 +10,7 @@
 
 #include "stddef.h"
 #include "stdbool.h"
+#include "stdint.h"
 
 typedef struct {
     void* start; // Address at which flash starts
@@ -25,5 +26,6 @@ typedef struct {
 bool ota_flash_begin(size_t new_fw_size, FlashItf* flashItf);
 bool ota_flash_write(const void* buf, size_t len, FlashItf* flashItf);
 bool ota_flash_end(FlashItf* flashItf);
+uint32_t ota_flash_crc32();
 
 #endif /* OTA_FLASH_H_ */

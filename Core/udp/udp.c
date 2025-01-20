@@ -10,6 +10,8 @@
 #include "string.h"
 #include "stddef.h"
 
+#define UDP_MESSAGE_SIZE 1024
+
 ip_addr_t udp_target_ip;
 u16_t udp_target_port = 55151;
 

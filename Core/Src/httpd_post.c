@@ -13,6 +13,8 @@
 #include "../ota/ota.h"
 #include "../ota/ota_utils.h"
 #include "../udp/udp.h"
+#include "../ota/data_buffer.h"
+#include "stdlib.h"
 
 typedef enum  {
     PostAddressee_None,
@@ -29,6 +31,8 @@ static uint16_t s_chunks = 0;
 static uint32_t s_contentLength = 0;
 static uint16_t s_chunkIdx = 0;
 static uint32_t s_chunkSize = 0;
+static uint32_t s_bytesReceivedThisChunk = 0;
+static DataBuffer s_dataBuffer;
 
 /**
  * @ingroup httpd
@@ -53,22 +57,33 @@ static uint32_t s_chunkSize = 0;
 err_t httpd_post_begin(void *connection, const char *uri, const char *http_request,
                        u16_t http_request_len, int content_len, char *response_uri,
                        u16_t response_uri_len, u8_t *post_auto_wnd){
-    struct http_state* hs = (struct http_state*)connection;
+    // struct http_state* hs = (struct http_state*)connection;
 
     udp_send_message(uri);
+    uint16_t chunkIdx;
     if(parseOTABeginRequest(uri, &s_chunks, &s_contentLength)){
         if(ota_begin(s_contentLength)){
             postAddressee = PostAddressee_OTA_Begin;
         }
     }
-    else if(parseOTAWriteRequest(uri, &s_chunkIdx, &s_chunkSize)){
+    else if(parseOTAWriteRequest(uri, &chunkIdx, &s_chunkSize)){
+        if(s_chunkIdx != chunkIdx){
+            char udp_message[40];
+            snprintf(udp_message, 40, "Received data from chunk %d: %ld", s_chunkIdx, s_bytesReceivedThisChunk);
+            udp_send_message(udp_message);
+            s_chunkIdx = chunkIdx;
+            s_bytesReceivedThisChunk = 0;
+        }
         if(postAddressee == PostAddressee_OTA_Begin){
             postAddressee = PostAddressee_OTA_Write;
+        }
+        if(postAddressee == PostAddressee_OTA_Write){
+            DataBufferClear(&s_dataBuffer);
+            DataBufferExpect(&s_dataBuffer, s_chunkSize);
         }
     }
     else if(parseOTAEndRequest(uri)){
         if(postAddressee == PostAddressee_OTA_Write){
-            ota_end();
             postAddressee = PostAddressee_OTA_End;
         }
     }
@@ -96,15 +111,23 @@ err_t httpd_post_begin(void *connection, const char *uri, const char *http_reque
  */
 err_t httpd_post_receive_data(void *connection, struct pbuf *p) {
     err_t result = ERR_OK;
-    char udp_message[40];
-    snprintf(udp_message, 40, "Receive data tot_len %d", p->tot_len);
+    char udp_message[150];
+    snprintf(udp_message, sizeof(udp_message), "Receive data tot_len %d", p->tot_len);
     if(postAddressee == PostAddressee_OTA_Write){
-        uint16_t pIdx = 0;
         for(struct pbuf* pb = p; pb != NULL; pb = pb->next){
-            snprintf(udp_message, 40, "OTA Chunk %d: Writing %d bytes - %d", s_chunkIdx, pb->len, ++pIdx);
-            udp_send_message(udp_message);
+            s_bytesReceivedThisChunk += pb->len;
+            DataBufferAppend(&s_dataBuffer, pb->payload, pb->len);
+            if(DataBufferExpectReached(&s_dataBuffer) == 0) {
+                uint32_t writeLen = s_dataBuffer.bufferEndIdx;
+                snprintf(udp_message, sizeof(udp_message), "OTA Chunk %d: Writing %ld bytes", s_chunkIdx, writeLen);
+                udp_send_message(udp_message);
+                if(!ota_write(s_dataBuffer.buf, writeLen)) {
+                    return ERR_MEM;
+                }
+
+            }
             /*
-            if(!ota_write(p->payload, p->len)){
+            if(!ota_write(pb->payload, pb->len)){
                 return ERR_MEM;
             }
             */
@@ -126,9 +149,25 @@ err_t httpd_post_receive_data(void *connection, struct pbuf *p) {
  * @param response_uri_len Size of the 'response_uri' buffer.
  */
 void httpd_post_finished(void *connection, char *response_uri, u16_t response_uri_len) {
-    struct http_state* hs = (struct http_state*)connection;
-    if(postAddressee != PostAddressee_None){
+    // struct http_state* hs = (struct http_state*)connection;
+    if(postAddressee == PostAddressee_OTA_Begin){
         strcpy(response_uri,"/ok.html");
+    }
+    else if(postAddressee == PostAddressee_OTA_Write){
+        if(s_chunks > 0 && s_chunkIdx < s_chunks && s_chunkSize == s_dataBuffer.bufferEndIdx){
+            DataBufferClear(&s_dataBuffer);
+            strcpy(response_uri,"/ok.html");
+        }
+        else{
+            DataBufferClear(&s_dataBuffer);
+        }
+    }
+    else if(postAddressee == PostAddressee_OTA_End){
+        ota_end();
+        strcpy(response_uri,"/ok.html");
+    }
+    else if(postAddressee != PostAddressee_None){
+
     }
     return;
 }

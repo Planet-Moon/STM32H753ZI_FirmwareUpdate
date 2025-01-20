@@ -180,12 +180,6 @@ SECTIONS
     *(.Rx_PoolSection)
   } >RAM_D2
 
-  /* version section in flash */
-  .version_section 0x080FFF7C :
-  {
-  	KEEP(*(.version_section))
-  } >FLASH
-
   /* Remove information from the standard libraries */
   /DISCARD/ :
   {

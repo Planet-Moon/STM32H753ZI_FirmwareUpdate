@@ -12,6 +12,7 @@
 #include "flash.h"
 #include "ota.h"
 #include "data_buffer.h"
+#include "../udp/udp.h"
 
 #if defined(__GNUC__)
 #define IRAM __attribute__((noinline, section(".iram"))) // place functions in instruction ram memory (IRAM bool myFunc() {...})
@@ -27,10 +28,21 @@
 #define ARM_ENABLE_IRQ()
 #endif
 
+// Firmware version
+#define VERSION_MEMORY_SIZE 32
+#define NEW_VERSION_ADDRESS 0x081FFF7F
+#define MY_VERSION_ADDRESS  0x080FFF7F
+#if defined ( __GNUC__ ) /* GNU Compiler */
+// __attribute__((section(".debug_section"), used)) const char version_string2[3] = "AB";
+// __attribute__((section(".version_section"), used)) const char version_string[VERSION_MEMORY_SIZE] = "Version 1.0.0";
+#endif
+
 bool stm32h7_write(void*, const void*, size_t);
 bool stm32h7_swap(void);
 bool stm32h7_write_begin(void);
 bool stm32h7_write_end(void);
+
+bool new_fw_loaded = false;
 
 FlashItf flash_stm32h7 = {
         (void*) 0x08000000, // start
@@ -233,10 +245,9 @@ bool ota_write(const void* buf, size_t len){
 }
 
 bool ota_end(void) {
-
     stm32h7_write_end();
     if(ota_flash_end(&flash_stm32h7)){
-        HAL_NVIC_SystemReset(); // Reset system to swap banks
+        new_fw_loaded = true;
     }
     return false;
 }

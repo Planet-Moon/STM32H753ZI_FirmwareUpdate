@@ -207,7 +207,7 @@ uint32_t FLASH_If_EraseBank2() {
 
     HAL_FLASH_OB_Lock();
     HAL_FLASHEx_Lock_Bank1();
-    uint32_t flashError = HAL_FLASH_GetError();
+    // uint32_t flashError = HAL_FLASH_GetError();
     return 0;
 }
 

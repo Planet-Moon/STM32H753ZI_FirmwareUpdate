@@ -10,6 +10,7 @@
 
 #include "stdbool.h"
 
+extern bool new_fw_loaded;
 bool BankSwapBit(void);
 
 #endif /* OTA_OTA_STM32H753ZI_H_ */

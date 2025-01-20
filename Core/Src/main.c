@@ -70,7 +70,7 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-Timer timer_50ms;
+Timer timer_250ms;
 Timer timer_1500ms;
 Timer timer_10000ms;
 bool buttonPressed;
@@ -123,7 +123,7 @@ int main(void)
   MX_LWIP_Init();
   /* USER CODE BEGIN 2 */
 
-  timer_init(&timer_50ms, 50, &TimeSinceStartup64);
+  timer_init(&timer_250ms, 250, &TimeSinceStartup64);
   timer_init(&timer_1500ms, 1500, &TimeSinceStartup64);
   timer_init(&timer_10000ms, 10000, &TimeSinceStartup64);
   // tcp_server_init();
@@ -147,16 +147,19 @@ int main(void)
 	  CalculateTime();
 
 	  if(timer_run(&timer_10000ms)){
-		  HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 		  udp_send_message("10s timer triggered");
 	  }
-	  if(buttonPressed){
-	      buttonPressed = false;
-
+	  if(timer_run(&timer_250ms)){
+	      HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, BankSwapBit() ? GPIO_PIN_SET : GPIO_PIN_RESET);
+	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, new_fw_loaded ? GPIO_PIN_SET : GPIO_PIN_RESET);
+	      HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 	  }
-
-
-      HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, BankSwapBit() ? GPIO_PIN_SET : GPIO_PIN_RESET);
+	  if(buttonPressed){
+	      if(new_fw_loaded){
+	          HAL_NVIC_SystemReset(); // Reset system to swap banks and load new fw
+	      }
+	      buttonPressed = false;
+	  }
 	  MX_LWIP_Process();
   }
   /* USER CODE END 3 */

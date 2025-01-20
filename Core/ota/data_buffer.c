@@ -30,3 +30,11 @@ int32_t DataBufferAppend(DataBuffer* db, const char* data, size_t len){
         return DataBufferAvailable(db);
     }
 }
+
+void DataBufferExpect(DataBuffer* db, uint32_t expectedLen) {
+    db->expectedLen = expectedLen;
+}
+
+int32_t DataBufferExpectReached(DataBuffer* db) {
+    return db->bufferEndIdx - db->expectedLen;
+}

@@ -12,7 +12,8 @@
 #include "stdbool.h"
 #include "stddef.h"
 
-#define ROUND_DOWN(x,a) ((a) == 0 ? (x) : (((x)/(a))*(a)))
+#define ROUND_UP(x, a) ((a) == 0 ? (x) : ((((x) + (a) -1) / (a)) * (a)))
+#define ROUND_DOWN(x, a) ((a) == 0 ? (x) : (((x) / (a)) * (a)))
 
 uint32_t crc32(uint32_t crc, const char* buf, size_t len);
 
